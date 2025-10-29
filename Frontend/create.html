@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Create/Edit Student</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="container mt-4">
+    <h3 id="formTitle">Add Student</h3>
+    <form id="studentForm" enctype="multipart/form-data">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label>Name</label>
+          <input type="text" id="name" name="name" class="form-control" required>
+        </div>
+        <div class="col-md-3 mb-3">
+          <label>Age</label>
+          <input type="number" id="age" name="age" class="form-control" required>
+        </div>
+        <div class="col-md-3 mb-3">
+          <label>State</label>
+          <input type="text" id="stateId" name="stateId" class="form-control" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label>Address</label>
+          <input type="text" id="address" name="address" class="form-control">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label>Phone</label>
+          <input type="text" id="phoneNumber" name="phoneNumber" class="form-control" pattern="^[0-9]{10}$" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label>Photo</label>
+          <input type="file" id="photo" name="photo" class="form-control">
+        </div>
+      </div>
+
+      <hr>
+      <h5>Subjects</h5>
+      <table class="table" id="subjectsTable">
+        <thead><tr><th>Subject</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><input type="text" name="subjects" class="form-control" required></td>
+            <td><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <button type="button" class="btn btn-secondary" id="addRowBtn">+ Add Subject</button>
+      <hr>
+
+      <button type="submit" class="btn btn-primary" id="saveBtn">Save</button>
+      <button type="button" class="btn btn-warning" onclick="window.location='index.html'">Back</button>
+    </form>
+  </div>
+
+  <script src="js/common.js"></script>
+  <script>
+    const token = localStorage.getItem("token");
+    if (!token) window.location.href = "login.html";
+
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    //const API_BASE = "https://localhost:7049/api";
+
+    if (id) {
+      $("#formTitle").text("Edit Student");
+      $("#saveBtn").text("Update");
+      loadStudent(id);
+    }
+
+    $("#addRowBtn").click(() => {
+      $("#subjectsTable tbody").append(`
+        <tr>
+          <td><input type="text" name="subjects" class="form-control" required></td>
+          <td><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
+        </tr>
+      `);
+    });
+
+    function removeRow(btn) {
+      $(btn).closest("tr").remove();
+    }
+
+    function loadStudent(id) {
+      $.ajax({
+        url: `${API_BASE}/Students/GetStudentById/${id}`,
+        headers: { Authorization: `Bearer ${token}` },
+        success: (s) => {
+          $("#name").val(s.name);
+          $("#age").val(s.age);
+          $("#address").val(s.address);
+          $("#stateId").val(s.stateId);
+          $("#phoneNumber").val(s.phoneNumber);
+
+          $("#subjectsTable tbody").empty();
+          s.subjects.forEach(sub => {
+            $("#subjectsTable tbody").append(`
+              <tr>
+                <td><input type="text" name="subjects" class="form-control" value="${sub.subjectName}" required></td>
+                <td><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
+              </tr>
+            `);
+          });
+        },
+      });
+    }
+
+    $("#studentForm").on("submit", function (e) {
+      e.preventDefault();
+
+      const formData = new FormData();
+      formData.append("name", $("#name").val());
+      formData.append("age", $("#age").val());
+      formData.append("address", $("#address").val());
+      formData.append("stateId", $("#stateId").val());
+      formData.append("phoneNumber", $("#phoneNumber").val());
+
+      const file = $("#photo")[0].files[0];
+      if (file) formData.append("photo", file);
+
+      const subjects = [];
+      $("input[name='subjects']").each(function () {
+        subjects.push($(this).val());
+      });
+      subjects.forEach((s, i) => formData.append(`Subjects[${i}]`, s));
+
+      if (id) {
+        // Update: ask for password
+        Swal.fire({
+          title: "Enter Password",
+          input: "password",
+          inputAttributes: { autocapitalize: "off" },
+          showCancelButton: true,
+          confirmButtonText: "Update",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            if (result.value === "72991") {
+              $.ajax({
+                url: `${API_BASE}/Students/UpdateStudent/${id}`,
+                method: "PUT",
+                headers: { Authorization: `Bearer ${token}` },
+                processData: false,
+                contentType: false,
+                data: formData,
+                success: () => {
+                  Swal.fire("Updated!", "Student updated successfully", "success").then(() => {
+                    window.location = "index.html";
+                  });
+                },
+              });
+            } else {
+              Swal.fire("Wrong Password!", "", "error");
+            }
+          }
+        });
+      } else {
+        $.ajax({
+          url: `${API_BASE}/Students/CreateStudent`,
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          processData: false,
+          contentType: false,
+          data: formData,
+          success: () => {
+            Swal.fire("Saved!", "Student added successfully", "success").then(() => {
+              window.location = "index.html";
+            });
+          },
+        });
+      }
+    });
+  </script>
+</body>
+</html>
